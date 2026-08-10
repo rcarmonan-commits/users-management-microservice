@@ -42,3 +42,14 @@ build/
 
 /spec/
 .env
+
+### Configuracion local de asistentes de IA y editores ###
+### No forma parte de la entrega academica: no se versiona.    ###
+.spec-kit/
+.claude/
+.agents/
+.cursorrules
+.clinerules
+CLAUDE.md
+GEMINI.md
+.github/copilot-instructions.md
