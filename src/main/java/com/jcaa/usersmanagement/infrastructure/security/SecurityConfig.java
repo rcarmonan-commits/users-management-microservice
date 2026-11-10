@@ -20,19 +20,49 @@ public class SecurityConfig {
   private static final String[] OPEN_API_PATHS = {
     "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**"
   };
+  private static final String GASTOS_PATH = "/api/gastos";
+  private static final String GASTOS_DETAIL_PATH = "/api/gastos/**";
+  private static final String REPORTS_PATH = "/api/reports/**";
+
+  /**
+   * Content-Security-Policy restrictiva. La API devuelve JSON, de modo que lo
+   * unico que necesita cargar recursos es Swagger UI; todo lo demas se niega.
+   */
+  private static final String CONTENT_SECURITY_POLICY =
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+          + "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; "
+          + "frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'";
 
   @Bean
   public SecurityFilterChain securityFilterChain(
       final HttpSecurity http,
       final JwtAuthenticationFilter jwtAuthenticationFilter,
       final RestAuthenticationEntryPoint authenticationEntryPoint,
-      final RestAccessDeniedHandler accessDeniedHandler)
+      final RestAccessDeniedHandler accessDeniedHandler,
+      final LoginRateLimitFilter loginRateLimitFilter)
       throws Exception {
     http.csrf(AbstractHttpConfigurer::disable)
         .httpBasic(AbstractHttpConfigurer::disable)
         .formLogin(AbstractHttpConfigurer::disable)
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .headers(
+            headers ->
+                headers
+                    .contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY))
+                    .frameOptions(frame -> frame.deny())
+                    .contentTypeOptions(contentType -> {})
+                    .referrerPolicy(
+                        referrer ->
+                            referrer.policy(
+                                org.springframework.security.web.header.writers
+                                        .ReferrerPolicyHeaderWriter.ReferrerPolicy
+                                    .STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                    .httpStrictTransportSecurity(
+                        hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
+                    .addHeaderWriter(
+                        new org.springframework.security.web.header.writers.StaticHeadersWriter(
+                            "Permissions-Policy", "geolocation=(), microphone=(), camera=()")))
         .exceptionHandling(
             handling ->
                 handling
@@ -55,8 +85,21 @@ public class SecurityConfig {
                     .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.DELETE, USERS_DETAIL_PATH)
                     .hasRole("ADMIN")
+                    // Gastos: leer lo puede cualquier cuenta autenticada; escribir exige rol.
+                    .requestMatchers(HttpMethod.GET, GASTOS_PATH, GASTOS_DETAIL_PATH)
+                    .authenticated()
+                    .requestMatchers(HttpMethod.POST, GASTOS_PATH)
+                    .hasAnyRole("ADMIN", "MEMBER")
+                    .requestMatchers(HttpMethod.PUT, GASTOS_DETAIL_PATH)
+                    .hasAnyRole("ADMIN", "MEMBER")
+                    .requestMatchers(HttpMethod.DELETE, GASTOS_DETAIL_PATH)
+                    .hasRole("ADMIN")
+                    // Reportes: solo lectura, pero reservados a perfiles de control.
+                    .requestMatchers(HttpMethod.GET, REPORTS_PATH)
+                    .hasAnyRole("ADMIN", "REVIEWER")
                     .anyRequest()
                     .authenticated())
+        .addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
     return http.build();
   }
