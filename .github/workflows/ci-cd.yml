@@ -1,0 +1,74 @@
+name: CI/CD — Hexagonal DDD CQRS (Usuarios + Gastos #6)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, "feature/**", "fix/**", "security/**", "chore/**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Compilar y ejecutar la suite de pruebas
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar JDK 21 (Temurin) con cache de Maven
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      - name: Verificar que el wrapper de Maven es ejecutable
+        run: chmod +x ./mvnw
+
+      - name: Compilar el proyecto
+        run: ./mvnw -B -ntp -DskipTests compile
+
+      # La suite no necesita base de datos: los adaptadores InMemory y los
+      # dobles de prueba cubren las capas de dominio, aplicacion y entrypoints.
+      # Por eso el runner no requiere acceso a Alwaysdata.
+      - name: Ejecutar la suite completa de pruebas
+        run: ./mvnw -B -ntp test
+
+      - name: Publicar el informe de pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
+          retention-days: 7
+
+      - name: Empaquetar el artefacto ejecutable
+        run: ./mvnw -B -ntp -DskipTests package
+
+      - name: Verificar que la imagen Docker se construye
+        run: docker build -t users-gastos-spring-boot-6:ci .
+
+  deploy:
+    name: Despliegue continuo en Render
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      # Render redespliega solo con cada commit en main (autoDeployTrigger).
+      # Este paso solo dispara el webhook cuando se ha configurado el secreto,
+      # de modo que el pipeline no falla si no existe.
+      - name: Disparar el despliegue si hay webhook configurado
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
+            curl -fsSL -X POST "$RENDER_DEPLOY_HOOK_URL"
+            echo "Despliegue solicitado a Render."
+          else
+            echo "Sin RENDER_DEPLOY_HOOK_URL: Render redespliega por autoDeploy."
+          fi

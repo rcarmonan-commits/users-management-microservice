@@ -1,26 +1,45 @@
+# =====================================================================
+# Blueprint de Render — Ejercicio #6: Entidad Gasto
+# Arquitectura Hexagonal + DDD + CQRS sobre Spring Boot 3.3.5
+#
+# Los valores marcados con `sync: false` NO viajan en el repositorio:
+# se introducen en el panel de Render. Nunca pongas credenciales aqui.
+# =====================================================================
 services:
   - type: web
-    name: users-management-api
+    name: users-gastos-spring-boot-6
     runtime: docker
     plan: free
     branch: main
     autoDeployTrigger: commit
     healthCheckPath: /health
     envVars:
+      # ----------------------------------------------------------------
+      # Base de datos MySQL en Alwaysdata.
+      # La instancia es compartida con el ejercicio gemelo en PHP: la
+      # aplicacion NUNCA ejecuta DDL sobre ella.
+      # ----------------------------------------------------------------
       - key: DB_HOST
         sync: false
       - key: DB_PORT
-        sync: false
+        value: "3306"
       - key: DB_NAME
-        value: crud_usuarios
+        sync: false
       - key: DB_USERNAME
         sync: false
       - key: DB_PASSWORD
         sync: false
       - key: DB_SSL_MODE
         value: REQUIRED
+
+      # ----------------------------------------------------------------
+      # Correo saliente.
+      # Aviso: el plan gratuito de Render bloquea por firewall los puertos
+      # SMTP salientes 25, 465 y 587. Si la entrega de correo resulta
+      # obligatoria, hay que anteponer una pasarela HTTPS por el puerto 443.
+      # ----------------------------------------------------------------
       - key: SMTP_HOST
-        value: smtp.gmail.com
+        sync: false
       - key: SMTP_PORT
         value: "587"
       - key: SMTP_USERNAME
@@ -30,8 +49,15 @@ services:
       - key: SMTP_FROM_ADDRESS
         sync: false
       - key: SMTP_FROM_NAME
-        value: Gestion de Usuarios
+        value: Gestion de Usuarios y Gastos
+
+      # ----------------------------------------------------------------
+      # Firma de tokens JWT.
+      # Debe ser Base64 valido que decodifique a 32 bytes o mas: el
+      # servicio hace Base64.getDecoder().decode(secret) y HS256 exige
+      # una clave de 256 bits. Un valor mas corto impide el arranque.
+      # ----------------------------------------------------------------
       - key: JWT_SECRET
-        generateValue: true
+        sync: false
       - key: JWT_EXPIRATION_SECONDS
         value: "900"

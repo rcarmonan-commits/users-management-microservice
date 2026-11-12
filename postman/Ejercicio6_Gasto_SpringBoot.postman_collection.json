@@ -1,0 +1,722 @@
+{
+  "info": {
+    "name": "Ejercicio 6 - Gasto | Spring Boot Hexagonal DDD CQRS",
+    "description": "Coleccion de pruebas de la API del Ejercicio N.6 (Entidad Gasto).\n\nUso:\n1. Selecciona el entorno y ajusta la variable baseUrl.\n2. Ejecuta 'Autenticacion > Login': el token se guarda solo en la variable 'jwt' y el resto de peticiones lo usan automaticamente.\n\nAutor: Rosary Eilyn Carmona Navarro <rcarmonan@unicartagena.edu.co>",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://users-gastos-spring-boot-6.onrender.com",
+      "description": "Produccion en Render. Para local usar http://localhost:8080"
+    },
+    {
+      "key": "jwt",
+      "value": "",
+      "description": "Se rellena solo tras el login"
+    },
+    {
+      "key": "gastoId",
+      "value": "1"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Salud",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Endpoint publico. Confirma que el servicio responde y devuelve su version.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "01 - Autenticacion",
+      "item": [
+        {
+          "name": "Login (guarda el token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Obtiene el JWT. El script de prueba lo guarda en la variable 'jwt'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"correo@ejemplo.com\",\n  \"password\": \"TuClaveAqui\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const cuerpo = pm.response.json();",
+                  "if (cuerpo && cuerpo.token) {",
+                  "    pm.collectionVariables.set('jwt', cuerpo.token);",
+                  "    console.log('Token almacenado en la variable jwt');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Gastos (CRUDL)",
+      "item": [
+        {
+          "name": "Crear gasto (IVA liquidado por el dominio)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/gastos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "gastos"
+              ]
+            },
+            "description": "Al enviar 'tarifaIva', el dominio calcula el IVA y los totales cuadran por construccion. Responde 201.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": \"2026-05-10\",\n  \"valorTotalSinIVA\": 100000,\n  \"nombreUsuario\": \"admin\",\n  \"lugar\": \"Ferreteria Norte\",\n  \"descripcion\": \"Compra de herramientas\",\n  \"tarifaIva\": \"GENERAL\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const cuerpo = pm.response.json();",
+                  "if (cuerpo && cuerpo.id) {",
+                  "    pm.collectionVariables.set('gastoId', cuerpo.id);",
+                  "}",
+                  "pm.test('Los totales cuadran', function () {",
+                  "    const suma = cuerpo.valorTotalSinIVA + cuerpo.ivaTotal;",
+                  "    pm.expect(Math.abs(suma - cuerpo.valorTotalConIVA)).to.be.below(0.01);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear gasto con totales incoherentes (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/gastos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "gastos"
+              ]
+            },
+            "description": "Caso negativo: la base mas el IVA no suman el total declarado. El dominio lo rechaza con 422 Unprocessable Entity.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": \"2026-05-10\",\n  \"valorTotalSinIVA\": 100000,\n  \"ivaTotal\": 19000,\n  \"valorTotalConIVA\": 500000,\n  \"nombreUsuario\": \"admin\",\n  \"lugar\": \"Tienda de prueba\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 422 por invariante fiscal', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar gastos (filtros independientes)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/gastos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "gastos"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "hasta",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "tarifaIva",
+                  "value": "GENERAL",
+                  "disabled": true
+                },
+                {
+                  "key": "lugar",
+                  "value": "ferreteria",
+                  "disabled": true
+                },
+                {
+                  "key": "nombreUsuario",
+                  "value": "admin",
+                  "disabled": true
+                },
+                {
+                  "key": "montoMinimo",
+                  "value": "50000",
+                  "disabled": true
+                },
+                {
+                  "key": "montoMaximo",
+                  "value": "500000",
+                  "disabled": true
+                },
+                {
+                  "key": "limite",
+                  "value": "10",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Todos los parametros son opcionales y combinables. Activalos segun necesites."
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar gasto por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/gastos/{{gastoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "gastos",
+                "{{gastoId}}"
+              ]
+            },
+            "description": "Devuelve 404 si el identificador no existe."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar gasto",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/gastos/{{gastoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "gastos",
+                "{{gastoId}}"
+              ]
+            },
+            "description": "Modifica un gasto existente. Exige rol ADMIN o MEMBER.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": \"2026-05-11\",\n  \"valorTotalSinIVA\": 150000,\n  \"nombreUsuario\": \"admin\",\n  \"lugar\": \"Ferreteria Sur\",\n  \"descripcion\": \"Ajuste de la compra\",\n  \"tarifaIva\": \"GENERAL\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar gasto",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/gastos/{{gastoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "gastos",
+                "{{gastoId}}"
+              ]
+            },
+            "description": "Responde 204 sin contenido. Reservado al rol ADMIN."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Reportes analiticos (CQRS)",
+      "item": [
+        {
+          "name": "1. Auditoria fiscal de IVA",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/iva",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "iva"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "hasta",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "tarifaIva",
+                  "value": "GENERAL",
+                  "disabled": true
+                },
+                {
+                  "key": "formato",
+                  "value": "csv",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Agrupa por tarifa efectiva. Añade formato=csv para descargar."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Ranking por establecimiento",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/lugares",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "lugares"
+              ],
+              "query": [
+                {
+                  "key": "lugar",
+                  "value": "ferreteria",
+                  "disabled": true
+                },
+                {
+                  "key": "formato",
+                  "value": "csv",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Concentracion del gasto por lugar, de mayor a menor."
+          },
+          "response": []
+        },
+        {
+          "name": "3. Consolidado por usuario",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "usuarios"
+              ],
+              "query": [
+                {
+                  "key": "nombreUsuario",
+                  "value": "admin",
+                  "disabled": true
+                },
+                {
+                  "key": "montoMinimo",
+                  "value": "10000",
+                  "disabled": true
+                },
+                {
+                  "key": "formato",
+                  "value": "csv",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "El filtro usa el IDENTIFICADOR de cuenta, no el nombre de presentacion."
+          },
+          "response": []
+        },
+        {
+          "name": "4. Evolucion mensual",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/mensual",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "mensual"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "formato",
+                  "value": "csv",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Serie cronologica por periodo con su promedio."
+          },
+          "response": []
+        },
+        {
+          "name": "5. Top gastos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/top",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "top"
+              ],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "5",
+                  "disabled": true
+                },
+                {
+                  "key": "lugar",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Gastos de mayor impacto presupuestal."
+          },
+          "response": []
+        },
+        {
+          "name": "6. Detalle transaccional",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/detalle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "detalle"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "nombreUsuario",
+                  "value": "admin",
+                  "disabled": true
+                },
+                {
+                  "key": "formato",
+                  "value": "csv",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Listado completo con todos los filtros disponibles."
+          },
+          "response": []
+        },
+        {
+          "name": "7. Directorio por rol",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "roles"
+              ]
+            },
+            "description": "Usuarios agrupados por rol."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Usuarios (entidad comun)",
+      "item": [
+        {
+          "name": "Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            },
+            "description": "Requiere rol ADMIN o REVIEWER."
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar usuario por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/admin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "admin"
+              ]
+            },
+            "description": "Devuelve 404 si no existe."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 - Seguridad (casos negativos)",
+      "item": [
+        {
+          "name": "Sin token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/gastos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "gastos"
+              ]
+            },
+            "description": "Confirma que la API rechaza peticiones sin autenticacion.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401 sin token', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cabeceras de seguridad",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Verifica el endurecimiento OWASP de las cabeceras HTTP.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('X-Content-Type-Options', function () {",
+                  "    pm.response.to.have.header('X-Content-Type-Options');",
+                  "});",
+                  "pm.test('X-Frame-Options', function () {",
+                  "    pm.response.to.have.header('X-Frame-Options');",
+                  "});",
+                  "pm.test('Content-Security-Policy', function () {",
+                  "    pm.response.to.have.header('Content-Security-Policy');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
