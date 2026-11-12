@@ -11,7 +11,7 @@ arquitectura hexagonal del proyecto base.
 | Campo | Detalle |
 |---|---|
 | **Universidad** | Universidad de Cartagena |
-| **Programa** | Ingeniería de Sistemas |
+| **Programa** | Ingeniería de Software |
 | **Asignatura** | Desarrollo Web |
 | **Unidad** | Unidad 2 |
 | **Semestre** | 2026-I |
