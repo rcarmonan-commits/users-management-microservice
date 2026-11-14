@@ -13,7 +13,7 @@ arquitectura hexagonal del proyecto base.
 | **Universidad** | Universidad de Cartagena |
 | **Programa** | Ingeniería de Software |
 | **Asignatura** | Desarrollo Web |
-| **Unidad** | Unidad 2 |
+| **Unidad** | Unidad 3 |
 | **Semestre** | 2026-I |
 | **Actividad** | CRUD de Usuarios con Arquitectura Hexagonal, DDD y CQRS en Spring Boot |
 | **Ejercicio asignado** | **N.º 6 — Entidad `Gasto`** |
