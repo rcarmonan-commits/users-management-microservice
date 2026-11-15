@@ -7,7 +7,9 @@
 # =====================================================================
 services:
   - type: web
-    name: users-gastos-spring-boot-6
+    # Nombre propio del servicio gestionado por Blueprint, para no colisionar
+    # con el servicio creado manualmente desde el panel.
+    name: users-gastos-spring-boot-6-bp
     runtime: docker
     plan: free
     branch: main
