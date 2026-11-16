@@ -21,7 +21,8 @@ arquitectura hexagonal del proyecto base.
 | **Estudiante** | Rosary Eilyn Carmona Navarro |
 | **Correo institucional** | `rcarmonan@unicartagena.edu.co` |
 | **Repositorio (fork)** | https://github.com/rcarmonan-commits/users-management-microservice |
-| **Despliegue** | https://users-gastos-spring-boot-6.onrender.com |
+| **Despliegue (oficial)** | https://users-gastos-spring-boot-6.onrender.com |
+| **Despliegue (Blueprint IaC)** | https://users-gastos-spring-boot-6-bp.onrender.com |
 | **Swagger UI** | https://users-gastos-spring-boot-6.onrender.com/swagger-ui.html |
 | **Base de datos** | MySQL en Alwaysdata |
 
@@ -264,9 +265,29 @@ Qué se verifica, más allá del camino feliz:
 
 ## 9. Despliegue e integración continua
 
-**Render** con runtime Docker y redespliegue automático en cada commit a `main`. El blueprint está
-en [`render.yaml`](render.yaml); las credenciales se introducen en el panel y **nunca** viajan en
-el repositorio.
+**Render** con runtime Docker y redespliegue automático en cada commit a `main`.
+
+El proyecto está desplegado **dos veces desde el mismo commit**, lo que demuestra que la
+arquitectura es independiente de la forma de desplegarla:
+
+| Servicio | Origen | Para qué |
+|---|---|---|
+| `users-gastos-spring-boot-6` | Creado desde el panel | Despliegue oficial de la entrega |
+| `users-gastos-spring-boot-6-bp` | Creado desde [`render.yaml`](render.yaml) | Evidencia de infraestructura en código |
+
+### Infraestructura como código
+
+El archivo [`render.yaml`](render.yaml) declara el servicio completo: runtime, plan, rama,
+redespliegue automático, ruta de health check y todas las variables de entorno. Quien clone el
+repositorio puede levantar una infraestructura idéntica sin configurar nada a mano.
+
+Las credenciales **nunca viajan en el repositorio**: van marcadas con `sync: false`, de modo que
+Render las solicita una sola vez al crear el Blueprint y las guarda cifradas en su panel. El
+archivo versionado solo contiene los nombres de las variables, nunca sus valores.
+
+> Los dos servicios llevan nombres distintos a propósito. La documentación de Render advierte que
+> si un Blueprint declara el nombre de un servicio ya existente, **intenta aplicarle su
+> configuración**, lo que habría sobrescrito los ajustes del servicio creado a mano.
 
 **GitHub Actions** en [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml): compila con
 JDK 21, ejecuta las 232 pruebas, publica el informe, empaqueta el jar y valida la construcción de
